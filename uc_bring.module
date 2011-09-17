@@ -85,47 +85,45 @@ function uc_bring_ca_predicate() {
  */
 function uc_bring_quote($products, $details, $method) {
   // Set some sensible defaults.
-  $servicepakke = array(
-		 'rate'          => 0,
-		 'option_label'  => t('Kunne ikkje rekne ut frakt. Send tiniginga, også sender vi deg informasjon om totalpris. Tinginga er ikkje bindande før du har bekrefta at du vil kjøpe.'),
-			);
-  $bedriftspakke = array(
-		 'rate'          => 0,
-		 'option_label'  => t('Kunne ikkje rekne ut frakt. Send tiniginga, også sender vi deg informasjon om totalpris. Tinginga er ikkje bindande før du har bekrefta at du vil kjøpe.'),
-			);
   $accessorials = _uc_bring_accessorials();
   
-  $cart_weight = uc_bring_total_weight($products);
-
+  $vekt = uc_bring_total_weight($products);
+  
   $postnummer = $details['postal_code'];
+  
+  $quotes['servicepakke'] = frakt_pris_type('servicepakke', "SERVICEPAKKE", $postnummer, $vekt, $accessorials);
+  if(!is_array($quotes['servicepakke']))
+    return;
 
-  $servicepakke['option_label'] = $accessorials['servicepakke'];
-  $servicepakke['rate'] = round(frakt_pris($cart_weight, $postnummer, "SERVICEPAKKE"));
-  $servicepakke['carrier'] = 'servicepakke';
-  
-  // Format the shipping rate for screen display.
-  $servicepakke['format'] = uc_price(
-			      $quote['rate'],
-			      array('revision' => 'formatted-original', 'type' => 'amount')
-			      );
+  $quotes['bedriftspakke'] = frakt_pris_type('bedriftspakke', "BPAKKE_DOR-DOR", $postnummer, $vekt, $accessorials);
+  if(!is_array($quotes['bedriftspakke']))
+    return;
 
-  $bedriftspakke['option_label'] = $accessorials['bedriftspakke'];
-  $bedriftspakke['rate'] = round(frakt_pris($cart_weight, $postnummer, "BPAKKE_DOR-DOR"));
-  $bedriftspakke['carrier'] = 'bedriftspakke';
-  
-  // Format the shipping rate for screen display.
-  $bedriftspakke['format'] = uc_price(
-			      $quote['rate'],
-			      array('revision' => 'formatted-original', 'type' => 'amount')
-			      );
-  
-  // Bundle it into a 1-element array so Ubercart can use it.
-  $quotes['servicepakke'] = $servicepakke;
-  $quotes['bedriftspakke'] = $bedriftspakke;
-  
   return $quotes;
 }
 
+
+function frakt_pris_type($indeks, $typenavn, $postnummer, $vekt, $accessorials){
+ // Set some sensible defaults.
+  $pakke = array(
+		 'rate'          => 0,
+		 'option_label'  => t('Kunne ikkje rekne ut frakt. Send tiniginga, også sender vi deg informasjon om totalpris. Tinginga er ikkje bindande før du har bekrefta at du vil kjøpe.'),
+			);
+  $pakke['option_label'] = $accessorials[$indeks];
+  $frakt = frakt_pris($vekt, $postnummer, $typenavn);
+  if(!is_numeric($frakt))
+    return;
+  
+  $pakke['rate'] = round($frakt);
+  $pakke['carrier'] = $indeks;
+  
+  // Format the shipping rate for screen display.
+  $pakke['format'] = uc_price(
+				     $quote['rate'],
+				     array('revision' => 'formatted-original', 'type' => 'amount')
+				     );
+  return $pakke;
+}
 
 function frakt_pris($vekt, $postnummer, $pakketype){
   if(is_numeric($vekt) && $vekt > 0){
@@ -133,10 +131,15 @@ function frakt_pris($vekt, $postnummer, $pakketype){
     $brutto_vekt = $vekt + $tara;
     $file = fopen("http://fraktguide.bring.no/fraktguide/products/price.xml?from=5081&to=" . $postnummer . "&weightInGrams=" . $brutto_vekt . "&product=" . $pakketype . "&edi=false&postingAtPostoffice=true", "br");
     if (!$file) {
-      return "Feil under henting av fraktpris.";
+      return;
     }
+    if(!stream_set_timeout($file, 10))
+      return;
     while (!feof ($file)) {
       $line = fgets ($file, 1024);
+      $info = stream_get_meta_data($file);
+      if($info['timed_out'])
+	return;
       /* This only works if the title and its tags are on one line */
       if (preg_match ("@\<AmountWithVAT\>(.*)\</AmountWithVAT\>@i", $line, $out)) {
 	$fraktpris = $out[1];
