@@ -131,10 +131,9 @@ function frakt_pris($vekt, $postnummer, $pakketype){
   if(is_numeric($vekt) && $vekt > 0){
     $tara = 1000;
     $brutto_vekt = $vekt + $tara;
-    $file = fopen("http://fraktguide.bring.no/fraktguide/products/price.xml?from=5006&to=" . $postnummer . "&weightInGrams=" . $brutto_vekt . "&product=" . $pakketype . "&edi=false&postingAtPostoffice=true", "r");
+    $file = fopen("http://fraktguide.bring.no/fraktguide/products/price.xml?from=5081&to=" . $postnummer . "&weightInGrams=" . $brutto_vekt . "&product=" . $pakketype . "&edi=false&postingAtPostoffice=true", "br");
     if (!$file) {
-      echo "<p>Unable to open remote file.\n";
-      exit;
+      return "Feil under henting av fraktpris.";
     }
     while (!feof ($file)) {
       $line = fgets ($file, 1024);
