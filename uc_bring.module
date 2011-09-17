@@ -1,0 +1,35 @@
+/**
+	implementation of Ubercart's hook_shipping_method().
+*/
+function uc_bring_shipping_method() {
+      $methods = array();
+     
+      $enabled = variable_get('uc_quote_enabled', array());
+      $weight = variable_get('uc_quote_method_weight', array());
+     
+      $methods['bring'] = array(
+        'id' => 'bring',
+        'module' => 'uc_bring',
+        'title' => t('Posten Bring Servicepakke'),
+        'enabled' => $enabled['bring'],
+        'quote' => array(
+          'type' => 'order',
+          'callback' => 'uc_bring_quote',
+          'accessorials' => _uc_bring_accessorials(),
+        ),
+        'weight' => $weight['bring'],
+      );
+     
+      return $methods;
+ }
+
+
+    function _uc_bring_accessorials() {
+      return array(
+        'aramex'    => t('Delivery (Aramex, Irish Palletised Carriers)'),
+        'hacklings' => t('Delivery (Hacklings Palletline)'),
+        'nf'        => t('Delivery (Nightfreight)'),
+        'post'      => t('Postage and Packing (1st class Royal Mail)'),
+      );
+    }
+

@@ -1,0 +1,77 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * Install hooks for uc_bring.module.
+ */
+
+/**
+ * Implementation of hook_requirements().
+ */
+function uc_bring_requirements($phase) {
+  $t = get_t();
+
+  $has_simplexml = class_exists('SimpleXMLElement');
+  $requirements['uc_bring_simplexml'] = array(
+    'title' => $t('SimpleXML'),
+    'value' => $has_simplexml ? $t('Enabled') : $t('Not found'),
+  );
+  if (!$has_simplexml) {
+    $requirements['uc_bring_simplexml']['severity'] = REQUIREMENT_ERROR;
+    $requirements['uc_bring_simplexml']['description'] = $t('Bring fraktguide requires the PHP <a href="!simplexml_url">SimpleXML</a> library.', array('!simplexml_url' => 'http://php.net/manual/en/simplexml.setup.php'));
+  }
+
+  return $requirements;
+}
+
+/**
+ * Implementation of hook_schema().
+ */
+function uc_bring_schema() {
+  $schema = array();
+
+  $schema['uc_bring_products'] = array(
+    'fields' => array(
+      'vid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'nid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'container' => array(
+        'type' => 'varchar',
+        'length' => '255',
+        'not null' => TRUE,
+        'default' => '',
+      ),
+    ),
+    'primary key' => array('vid'),
+  );
+
+  return $schema;
+}
+
+/**
+ * Implementation of hook_install().
+ */
+function uc_bring_install() {
+  drupal_install_schema('uc_bring');
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function uc_bring_uninstall() {
+  drupal_uninstall_schema('uc_bring');
+  variable_del('uc_bring_user_id');
+  variable_del('uc_bring_services');
+  variable_del('uc_bring_markup');
+}
+
