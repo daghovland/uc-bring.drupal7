@@ -1,67 +1,177 @@
 <?php
 /**
-	implementation of Ubercart's hook_shipping_method().
+   This started out copied from the blog post by Chris Cohen at
+   
+   http://tiger-fish.com/blog/tutorial-writing-drupal-6-ubercart-shipping-module
+   
+   Altered for our purposes
+**/
+
+/**
+   implementation of Ubercart's hook_shipping_method().
 */
 function uc_bring_shipping_method() {
-      $methods = array();
-     
-      $enabled = variable_get('uc_quote_enabled', array());
-      $weight = variable_get('uc_quote_method_weight', array());
-     
-      $methods['bring'] = array(
-        'id' => 'bring',
-        'module' => 'uc_bring',
-        'title' => t('Posten Bring Servicepakke'),
-        'enabled' => $enabled['bring'],
-        'quote' => array(
-          'type' => 'order',
-          'callback' => 'uc_bring_quote',
-          'accessorials' => _uc_bring_accessorials(),
-        ),
-        'weight' => $weight['bring'],
-      );
-     
-      return $methods;
- }
+  $methods = array();
+  
+  $enabled = variable_get('uc_quote_enabled', array());
+  $weight = variable_get('uc_quote_method_weight', array());
+  
+  $methods['bring'] = array(
+			    'id' => 'bring',
+			    'module' => 'uc_bring',
+			    'title' => t('Posten/Bring'),
+			    'enabled' => $enabled['bring'],
+			    'quote' => array(
+					     'type' => 'order',
+					     'callback' => 'uc_bring_quote',
+					     'accessorials' => _uc_bring_accessorials(),
+					     ),
+			    'weight' => $weight['bring'],
+			    );
+  
+  return $methods;
+}
 
 
 function _uc_bring_accessorials() {
-      return array(
-        'aramex'    => t('Delivery (Aramex, Irish Palletised Carriers)'),
-        'hacklings' => t('Delivery (Hacklings Palletline)'),
-        'nf'        => t('Delivery (Nightfreight)'),
-        'post'      => t('Postage and Packing (1st class Royal Mail)'),
-     );
+  return array(
+	       'servicepakke'    => t('Klimanøytral Servicepakke (Dei fleste må velje dette.)'),
+	       'bedriftspakke' => t('Bedriftspakke - dør til dør (NB! Berre til bedrifter!)'),
+	       'pakke_pa_doren'        => t('Pakke På Døra (Til privatpersoner på kveldstid.)'),
+	       'utlandet'      => t('Pakke til privatpersoner i utlandet'),
+	       );
 }
 
-    /**
-     * Implementation of hook_ca_predicate().
-     *
-     * Connect the quote action with the quote event.
-     */
-    function uc_bring_ca_predicate() {
-      $enabled = variable_get('uc_quote_enabled', array());
-      $predicates = array();
-     
-      $predicates['uc_bring_get_quote'] = array(
-        '#title'    => t('Posten Servicepakke frakt'),
-        '#trigger'  => 'get_quote_from_bring',
-        '#class'    => 'uc_bring',
-        '#status'   => $enabled['bring'],
-        '#actions'  => array(
-          array(
-            '#name'         => 'uc_quote_action_get_quote',
-            '#title'        => t('Fetch a Bring shipping quote.'),
-            '#argument_map' => array(
-              'order'   => 'order',
-              'method'  => 'method',
-            ),
-          ),
-        ),
-      );
-     
-      return $predicates;
-    }
+/**
+ * Implementation of hook_ca_predicate().
+ *
+ * Connect the quote action with the quote event.
+ */
+function uc_bring_ca_predicate() {
+  $enabled = variable_get('uc_quote_enabled', array());
+  $predicates = array();
+  
+  $predicates['uc_bring_get_quote'] = array(
+					    '#title'    => t('Bring Servicepakke pris'),
+					    '#trigger'  => 'get_quote_from_bring',
+					    '#class'    => 'uc_bring',
+					    '#status'   => $enabled['bring'],
+					    '#actions'  => array(
+								 array(
+								       '#name'         => 'uc_quote_action_get_quote',
+								       '#title'        => t('Hent Bring Servicepakke fraktpris.'),
+								       '#argument_map' => array(
+												'order'   => 'order',
+												'method'  => 'method',
+												),
+								       ),
+								 ),
+					    );
+  
+  return $predicates;
+}
 
+/**
+ * Standard callback to return a custom Bring Servicepakke shipping rate.
+ *
+ * @param $products
+ *   The order's products.
+ * @param $details
+ *   Other order details including a shipping address.
+ * @param $method
+ *   The shipping method to create the quote.
+ * @return
+ *   An array containing the shipping quote for the order.
+ */
+function uc_bring_quote($products, $details, $method) {
+  // Set some sensible defaults.
+  $servicepakke = array(
+		 'rate'          => 0,
+		 'option_label'  => t('Kunne ikkje rekne ut frakt. Send tiniginga, også sender vi deg informasjon om totalpris. Tinginga er ikkje bindande før du har bekrefta at du vil kjøpe.'),
+			);
+  $bedriftspakke = array(
+		 'rate'          => 0,
+		 'option_label'  => t('Kunne ikkje rekne ut frakt. Send tiniginga, også sender vi deg informasjon om totalpris. Tinginga er ikkje bindande før du har bekrefta at du vil kjøpe.'),
+			);
+  $accessorials = _uc_bring_accessorials();
+  
+  $cart_weight = uc_bring_total_weight($products);
+
+  $postnummer = $details['postal_code'];
+
+  $servicepakke['option_label'] = $accessorials['servicepakke'];
+  $servicepakke['rate'] = round(frakt_pris($cart_weight, $postnummer, "SERVICEPAKKE"));
+  $servicepakke['carrier'] = 'servicepakke';
+  
+  // Format the shipping rate for screen display.
+  $servicepakke['format'] = uc_price(
+			      $quote['rate'],
+			      array('revision' => 'formatted-original', 'type' => 'amount')
+			      );
+
+  $bedriftspakke['option_label'] = $accessorials['bedriftspakke'];
+  $bedriftspakke['rate'] = round(frakt_pris($cart_weight, $postnummer, "BPAKKE_DOR-DOR"));
+  $bedriftspakke['carrier'] = 'bedriftspakke';
+  
+  // Format the shipping rate for screen display.
+  $bedriftspakke['format'] = uc_price(
+			      $quote['rate'],
+			      array('revision' => 'formatted-original', 'type' => 'amount')
+			      );
+  
+  // Bundle it into a 1-element array so Ubercart can use it.
+  $quotes['servicepakke'] = $servicepakke;
+  $quotes['bedriftspakke'] = $bedriftspakke;
+  
+  return $quotes;
+}
+
+
+function frakt_pris($vekt, $postnummer, $pakketype){
+  if(is_numeric($vekt) && $vekt > 0){
+    $tara = 1000;
+    $brutto_vekt = $vekt + $tara;
+    $file = fopen("http://fraktguide.bring.no/fraktguide/products/price.xml?from=5006&to=" . $postnummer . "&weightInGrams=" . $brutto_vekt . "&product=" . $pakketype . "&edi=false&postingAtPostoffice=true", "r");
+    if (!$file) {
+      echo "<p>Unable to open remote file.\n";
+      exit;
+    }
+    while (!feof ($file)) {
+      $line = fgets ($file, 1024);
+      /* This only works if the title and its tags are on one line */
+      if (preg_match ("@\<AmountWithVAT\>(.*)\</AmountWithVAT\>@i", $line, $out)) {
+	$fraktpris = $out[1];
+	break;
+      }
+    }
+    fclose($file);
+    if(isset($fraktpris))
+      return $fraktpris;
+    else {
+      if($vekt = 0)
+	return "Kan ikkje berekne frakt på ei tom pakke";
+      else 
+	return "Det skjedde en feil. Pakka er truleg for tung til Servicepakke (maks 35 kilo). Det kan også vere at Servicepakke ikkje kan sendes til adressa, eller at Bring sine sider er nede.";
+      
+    }
+  }
+}
+
+ 
+/**
+ * Add up the weight of all the products in the cart.
+ *
+ * @param array products
+ *    An array of the products whose total weight is to be calculated.
+ */
+function uc_bring_total_weight($products) {
+  $weight = 0;
+ 
+  foreach ($products as $product) {
+    $weight += $product->qty * $product->weight;
+  }
+ 
+  return $weight;
+}
 
 ?>
