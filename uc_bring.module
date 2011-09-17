@@ -1,3 +1,4 @@
+<?php
 /**
 	implementation of Ubercart's hook_shipping_method().
 */
@@ -24,12 +25,43 @@ function uc_bring_shipping_method() {
  }
 
 
-    function _uc_bring_accessorials() {
+function _uc_bring_accessorials() {
       return array(
         'aramex'    => t('Delivery (Aramex, Irish Palletised Carriers)'),
         'hacklings' => t('Delivery (Hacklings Palletline)'),
         'nf'        => t('Delivery (Nightfreight)'),
         'post'      => t('Postage and Packing (1st class Royal Mail)'),
+     );
+}
+
+    /**
+     * Implementation of hook_ca_predicate().
+     *
+     * Connect the quote action with the quote event.
+     */
+    function uc_bring_ca_predicate() {
+      $enabled = variable_get('uc_quote_enabled', array());
+      $predicates = array();
+     
+      $predicates['uc_bring_get_quote'] = array(
+        '#title'    => t('Posten Servicepakke frakt'),
+        '#trigger'  => 'get_quote_from_bring',
+        '#class'    => 'uc_bring',
+        '#status'   => $enabled['bring'],
+        '#actions'  => array(
+          array(
+            '#name'         => 'uc_quote_action_get_quote',
+            '#title'        => t('Fetch a Bring shipping quote.'),
+            '#argument_map' => array(
+              'order'   => 'order',
+              'method'  => 'method',
+            ),
+          ),
+        ),
       );
+     
+      return $predicates;
     }
 
+
+?>
