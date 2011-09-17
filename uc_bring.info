@@ -1,8 +1,8 @@
 ; $Id$
 name = Bring Servicepakke
-description = Integrerer Bring sin berekning av servicepakke med ubercart. Basert på uc_usps
+description = Integrerer Bring sin berekning av servicepakke med ubercart. 
 dependencies[] = uc_quote
 package = Ubercart - fulfillment
-core = 6.x
+core = 7.x
 php = 5.0
 
